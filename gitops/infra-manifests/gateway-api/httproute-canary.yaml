@@ -1,0 +1,23 @@
+# Demonstrates traffic splitting: 90% of /api/catalog traffic to the stable
+# Service, 10% to a "canary" Service pointing at a newer Deployment revision.
+# To try it: `kubectl -n streamflix label deploy catalog-service-canary app.kubernetes.io/name=catalog-service-canary`
+# then create a matching Service named catalog-service-canary.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: catalog-canary-route
+  namespace: streamflix
+spec:
+  parentRefs:
+    - name: streamflix-gateway
+  hostnames: ["streamflix.local"]
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/catalog }
+      backendRefs:
+        - name: catalog-service
+          port: 8080
+          weight: 90
+        - name: catalog-service-canary
+          port: 8080
+          weight: 10

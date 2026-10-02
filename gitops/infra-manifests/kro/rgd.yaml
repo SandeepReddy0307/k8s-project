@@ -1,0 +1,79 @@
+# Defines a new Kind "MicroserviceApp" that, when created, generates a
+# Deployment + Service + HPA together. Mirrors what you already built by hand
+# in gitops/charts/*, but exposed as a simplified platform API.
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: microservice-app
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: MicroserviceApp
+    spec:
+      name: string
+      image: string
+      port: integer | default=8080
+      replicas: integer | default=2
+      host: string | default=""
+  resources:
+    - id: deployment
+      template:
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: "${schema.spec.name}"
+        spec:
+          replicas: "${schema.spec.replicas}"
+          selector:
+            matchLabels:
+              app: "${schema.spec.name}"
+          template:
+            metadata:
+              labels:
+                app: "${schema.spec.name}"
+            spec:
+              containers:
+                - name: "${schema.spec.name}"
+                  image: "${schema.spec.image}"
+                  ports:
+                    - containerPort: "${schema.spec.port}"
+                  livenessProbe:
+                    httpGet:
+                      path: /health
+                      port: "${schema.spec.port}"
+                  readinessProbe:
+                    httpGet:
+                      path: /ready
+                      port: "${schema.spec.port}"
+    - id: service
+      template:
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: "${schema.spec.name}"
+        spec:
+          selector:
+            app: "${schema.spec.name}"
+          ports:
+            - port: "${schema.spec.port}"
+              targetPort: "${schema.spec.port}"
+    - id: hpa
+      template:
+        apiVersion: autoscaling/v2
+        kind: HorizontalPodAutoscaler
+        metadata:
+          name: "${schema.spec.name}"
+        spec:
+          scaleTargetRef:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: "${schema.spec.name}"
+          minReplicas: "${schema.spec.replicas}"
+          maxReplicas: 6
+          metrics:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: 70

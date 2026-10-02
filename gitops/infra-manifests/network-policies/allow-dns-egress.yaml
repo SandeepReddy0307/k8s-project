@@ -1,0 +1,16 @@
+# Without this, default-deny ingress + any egress policy could break DNS lookups.
+# Egress isn't denied by default in this lab, but this policy documents the
+# allowance explicitly for when you flip on default-deny-egress too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: streamflix
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to: []
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }

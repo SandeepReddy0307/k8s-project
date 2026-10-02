@@ -1,0 +1,14 @@
+image:
+  repository: postgres
+  tag: "16-alpine"
+replicaCount: 1
+storage:
+  size: 2Gi
+  storageClassName: standard
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits: { cpu: 500m, memory: 512Mi }
+auth:
+  user: postgres
+  database: postgres
+  existingSecret: postgres-credentials

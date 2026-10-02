@@ -1,0 +1,7 @@
+image:
+  repository: localhost:5000/video-encoder-job
+  tag: latest
+cronSchedule: "0 2 * * *"   # nightly at 2am
+resources:
+  requests: { cpu: 100m, memory: 64Mi }
+  limits: { cpu: 500m, memory: 256Mi }

@@ -1,0 +1,11 @@
+# Example ConfigMap holding non-sensitive shared config consumed by multiple
+# services (demonstrates ConfigMap usage distinct from Secret usage).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streamflix-shared-config
+  namespace: streamflix
+data:
+  LOG_LEVEL: "info"
+  FEATURE_RECOMMENDATIONS: "true"
+  ENVIRONMENT: "local-kind"

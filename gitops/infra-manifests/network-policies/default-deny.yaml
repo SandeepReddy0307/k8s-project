@@ -1,0 +1,10 @@
+# Default-deny all ingress in the namespace; every allowed path below must be
+# explicitly opened. This is the standard zero-trust starting point.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: streamflix
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]

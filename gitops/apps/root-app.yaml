@@ -1,0 +1,26 @@
+# App-of-Apps root: ArgoCD watches this one Application, which in turn points
+# at the apps/ directory itself. Every child-app-*.yaml file added here gets
+# auto-discovered and synced. This is the standard ArgoCD App-of-Apps pattern.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: streamflix-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/<YOUR_GITHUB_USERNAME>/streamflix-gitops.git
+    targetRevision: main
+    path: apps
+    directory:
+      recurse: false
+      include: "child-*.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

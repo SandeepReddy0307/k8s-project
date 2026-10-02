@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-shipper
+  labels: { app.kubernetes.io/name: log-shipper }
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: log-shipper }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: log-shipper }
+    spec:
+      tolerations:
+        - operator: Exists    # ensures it also schedules on control-plane node
+      containers:
+        - name: fluent-bit
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: config
+              mountPath: /fluent-bit/etc/fluent-bit.conf
+              subPath: fluent-bit.conf
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: varlog
+          hostPath: { path: /var/log }
+        - name: config
+          configMap: { name: log-shipper-config }

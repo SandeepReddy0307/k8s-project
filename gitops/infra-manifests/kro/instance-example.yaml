@@ -1,0 +1,11 @@
+# Creating this single object produces Deployment+Service+HPA automatically.
+apiVersion: kro.run/v1alpha1
+kind: MicroserviceApp
+metadata:
+  name: demo-app-via-kro
+  namespace: streamflix
+spec:
+  name: demo-app-via-kro
+  image: localhost:5000/billing-service:latest
+  port: 8080
+  replicas: 2

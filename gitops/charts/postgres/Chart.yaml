@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgres
+description: PostgreSQL StatefulSet for StreamFlix (auth/catalog/user DBs share one instance via separate DB names for lab simplicity)
+type: application
+version: 0.1.0
+appVersion: "16"

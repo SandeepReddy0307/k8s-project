@@ -1,0 +1,71 @@
+// Declarative Jenkins pipeline: mirrors the GitHub Actions workflow so you
+// can compare both CI systems side by side. Run on the VM where Jenkins +
+// Docker + access to the local registry (localhost:5000) all live.
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'SERVICE', defaultValue: 'catalog-service', description: 'Which app/<service> directory to build')
+  }
+
+  environment {
+    REGISTRY = "localhost:5000"
+    GITOPS_REPO = "https://github.com/<YOUR_GITHUB_USERNAME>/streamflix-gitops.git"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Compute tag') {
+      steps {
+        script {
+          env.GIT_SHORT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        }
+      }
+    }
+
+    stage('Build image') {
+      steps {
+        sh """
+          docker build -t ${REGISTRY}/${params.SERVICE}:${GIT_SHORT_SHA} \
+                       -t ${REGISTRY}/${params.SERVICE}:latest \
+                       app/${params.SERVICE}
+        """
+      }
+    }
+
+    stage('Push image') {
+      steps {
+        sh """
+          docker push ${REGISTRY}/${params.SERVICE}:${GIT_SHORT_SHA}
+          docker push ${REGISTRY}/${params.SERVICE}:latest
+        """
+      }
+    }
+
+    stage('Update GitOps repo') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'gitops-repo-creds', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+          sh """
+            rm -rf gitops-checkout
+            git clone https://${GIT_USER}:${GIT_TOKEN}@${GITOPS_REPO#https://} gitops-checkout
+            cd gitops-checkout
+            sed -i "s|tag:.*|tag: \\"${GIT_SHORT_SHA}\\"|" charts/${params.SERVICE}/values.yaml
+            git config user.email "jenkins@local"
+            git config user.name "jenkins"
+            git add charts/${params.SERVICE}/values.yaml
+            git commit -m "ci(jenkins): bump ${params.SERVICE} to ${GIT_SHORT_SHA}" || echo "no changes"
+            git push
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success { echo "Built, pushed, and GitOps repo updated for ${params.SERVICE}:${GIT_SHORT_SHA}" }
+    failure { echo "Pipeline failed for ${params.SERVICE}" }
+  }
+}

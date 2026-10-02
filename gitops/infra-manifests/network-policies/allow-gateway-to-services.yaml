@@ -1,0 +1,18 @@
+# api-gateway and frontend are allowed to reach each backend service; nothing
+# else can reach the backends directly (so you can't bypass the gateway).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-ingress
+  namespace: streamflix
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [auth-service, catalog-service, user-service, search-service, recommendation-service, notification-service, billing-service]
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: api-gateway }

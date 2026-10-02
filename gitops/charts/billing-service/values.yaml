@@ -1,0 +1,44 @@
+image:
+  repository: localhost:5000/billing-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  port: 8080
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+env:
+  {}
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  create: true
+  name: ""
+
+vpa:
+  enabled: true
+  updateMode: "Auto"
+
+secretRef:
+  name: billing-secret
+  key: apiKey
+  envName: PAYMENT_API_KEY
