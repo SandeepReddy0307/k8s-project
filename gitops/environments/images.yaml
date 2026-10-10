@@ -1,6 +1,6 @@
 # GitHub Actions creates a promotion PR replacing this file with image digests.
 images:
-  registry: ghcr.io
+  registry: docker.io
   owner: ""
   tag: ""
   digests: {}

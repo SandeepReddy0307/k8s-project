@@ -1,6 +1,6 @@
 profile: learning
 images:
-  registry: ghcr.io
+  registry: docker.io
   owner: ""
   tag: ""
   digests: {}

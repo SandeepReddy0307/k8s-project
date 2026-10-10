@@ -24,7 +24,7 @@ Application images/releases, application distributed traces and application aler
 - Production overlay: complete synthetic environment inputs render successfully; learning datastores are absent and application images are digest-pinned. Missing required production inputs fail closed.
 - Loki chart 18.3.0 and Alloy chart 1.13.1: rendered and deployed successfully, using Loki 3.7.0 and Alloy v1.20.1. Live log ingestion was verified as recorded above.
 - GitHub Actions references: resolved to immutable commit SHAs using the upstream tag references.
-- Isolated real-service integration harness: prepared and attempted. Docker Desktop could not pull postgres:16-alpine because registry-1.docker.io timed out; service integration did not run locally. It is an explicit CI gate.
+- Isolated real-service integration harness: passed against temporary real Postgres and Redis instances. Verified migrations, hashed passwords, authenticated gateway proxying, secure cookies, user ownership, persisted watchlist/progress, numeric title IDs and invalid-ID rejection, idempotent sandbox billing, CSRF and logout. The earlier image-pull blocker is resolved. This remains an explicit CI gate.
 - Application image builds/scans, actual GitHub CI run, application rollout/live smoke, application DB TLS, production mTLS, Argo CD sync, load testing, backup restore and secret rotation remain unverified. Platform rollout, cross-node NetworkPolicy enforcement and Grafana HTTPS trust passed the checks above.
 
 These results describe a hardened implementation and reviewable deployment path. Production acceptance still depends on the supplied infrastructure, identities and successful staging verification.

@@ -42,14 +42,16 @@ Kubernetes Secret values are base64-encoded, not encrypted by base64. A real clu
 The active workflows are `.github/workflows/ci.yml` and `.github/workflows/deploy.yml`. Historical examples under `ci/github-actions` are not active workflows and target the retired v1 layout.
 
 1. Push the reviewed source to the intended GitHub repository. No remote commits or pushes were performed while preparing v2.
-2. Allow workflow packages to be published to GHCR. The build uses the repository owner dynamically and the built-in `GITHUB_TOKEN`; there is no hardcoded personal registry namespace.
-3. Enable repository permission for GitHub Actions to create pull requests. Protect `main` with the validation jobs and reviews. Restrict environments and permit workflow changes only through review.
+2. Add repository Actions secrets `DOCKERHUB_USERNAME` (the lowercase Docker Hub account name) and `DOCKERHUB_TOKEN` (an access token with read/write permission). CI publishes to `docker.io/<DOCKERHUB_USERNAME>/<service>:<Git SHA>`; the namespace comes from the secret. Create Docker Hub repositories for the twelve service names in the workflow matrix. Public repositories simplify learning-cluster pulls; private repositories need the pull Secret described below. Never commit the token.
+3. In repository Settings → Actions → General → Workflow permissions, enable **Allow GitHub Actions to create and approve pull requests**. The automatic `GITHUB_TOKEN` creates the promotion PR; Docker Hub uses its separate credentials. Protect `main` with the validation jobs and reviews. Restrict environments and permit workflow changes only through review.
 4. CI runs Node/Python security tests, the real Postgres/Redis integration harness, Helm gates, dependency audits and desktop/mobile browser tests. It builds all twelve images from repository-root contexts, scans them, publishes SBOM/provenance and records digests.
 5. One promotion job creates one PR changing `gitops/environments/images.yaml`. The full image set must be present; there are no racing per-service commits. Promotion-only changes do not retrigger image publication.
 6. Review and merge the promotion PR. The resulting manifest pins every application image by digest. The learning chart also accepts an immutable Git SHA tag; production requires digests.
 7. Register a dedicated self-hosted runner labeled `linux` and `streamflix` that can reach the cluster. GitHub-hosted runners cannot directly access the existing WSL kind API. Run this runner only for approved deployment jobs; it should not execute untrusted pull-request code.
 8. Create GitHub environments `learning` and `production`. Set environment variable `STREAMFLIX_NAMESPACE`; require approval for production. Supply a restricted short-lived cluster identity on the runner. Do not store a cluster-admin kubeconfig in Git.
 9. Run the deployment workflow for the reviewed release. Its Helm command waits for workloads and migration Jobs, has a timeout and rolls back failed Helm upgrades with `--atomic`.
+
+The first source push runs validation and image publication; it does not deploy the application. Merge the verified image promotion PR and configure the runner before triggering deployment.
 
 Build context example for troubleshooting (CI normally performs this):
 
@@ -59,7 +61,7 @@ docker build -f app/frontend/Dockerfile -t streamflix/frontend:test .
 
 The old `docker build app/frontend` context is incompatible with v2 because the services use a shared runtime and root lockfile.
 
-If GHCR packages are private, provision an image pull Secret through the secret manager and set `imagePullSecrets`. Ensure migration and CronJob Pods receive the same reference. Alternatively use public learning images. The registry token should have pull-only scope.
+If Docker Hub repositories are private, provision an image pull Secret through the secret manager and set `imagePullSecrets`. Ensure migration and CronJob Pods receive the same reference. Alternatively use public learning images. Use a separate pull-only token for the cluster; the CI read/write token stays in GitHub Actions secrets.
 
 ## Browser access and certificates
 

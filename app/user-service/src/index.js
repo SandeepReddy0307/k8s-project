@@ -1,13 +1,15 @@
 require('../../shared/tracing');
 const {createApp,database,requireIdentity}=require('../../shared/runtime');
 const {app,start}=createApp('user-service');const pool=database();
+// Catalog IDs are positive PostgreSQL SERIAL values; reject larger/unsafe inputs.
+const validTitleId=value=>/^\d+$/.test(value)&&Number.isInteger(Number(value))&&Number(value)>0&&Number(value)<=2147483647;
 app.get('/ready',async(_req,res)=>{await pool.query('SELECT 1 FROM profiles LIMIT 1');res.json({status:'ready'});});
 app.use(requireIdentity);
 app.get('/profile',async(req,res)=>{const {rows}=await pool.query('SELECT email,display_name FROM profiles WHERE email=$1',[req.identity.email]);res.json(rows[0]||{email:req.identity.email,display_name:req.identity.email.split('@')[0]});});
 app.put('/profile',async(req,res)=>{const name=req.body.display_name;if(typeof name!=='string'||name.trim().length<1||name.length>64)return res.status(400).json({error:'invalid-name'});const {rows}=await pool.query('INSERT INTO profiles(email,display_name) VALUES($1,$2) ON CONFLICT(email) DO UPDATE SET display_name=EXCLUDED.display_name RETURNING email,display_name',[req.identity.email,name.trim()]);res.json(rows[0]);});
-app.get('/my-list',async(req,res)=>{const {rows}=await pool.query('SELECT title_id FROM watchlist WHERE email=$1 ORDER BY created_at DESC',[req.identity.email]);res.json(rows.map(r=>r.title_id));});
-app.put('/my-list/:id',async(req,res)=>{if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:'invalid-title'});await pool.query('INSERT INTO watchlist(email,title_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.identity.email,req.params.id]);res.status(204).end();});
-app.delete('/my-list/:id',async(req,res)=>{if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:'invalid-title'});await pool.query('DELETE FROM watchlist WHERE email=$1 AND title_id=$2',[req.identity.email,req.params.id]);res.status(204).end();});
-app.put('/progress/:id',async(req,res)=>{const seconds=Number(req.body.seconds);if(!/^\d+$/.test(req.params.id)||!Number.isFinite(seconds)||seconds<0||seconds>86400)return res.status(400).json({error:'invalid-progress'});await pool.query('INSERT INTO progress(email,title_id,seconds) VALUES($1,$2,$3) ON CONFLICT(email,title_id) DO UPDATE SET seconds=EXCLUDED.seconds,updated_at=now()',[req.identity.email,req.params.id,seconds]);res.status(204).end();});
-app.get('/progress',async(req,res)=>{const {rows}=await pool.query('SELECT title_id,seconds,updated_at FROM progress WHERE email=$1 ORDER BY updated_at DESC',[req.identity.email]);res.json(rows);});
+app.get('/my-list',async(req,res)=>{const {rows}=await pool.query('SELECT title_id FROM watchlist WHERE email=$1 ORDER BY created_at DESC',[req.identity.email]);res.json(rows.map(r=>Number(r.title_id)));});
+app.put('/my-list/:id',async(req,res)=>{if(!validTitleId(req.params.id))return res.status(400).json({error:'invalid-title'});await pool.query('INSERT INTO watchlist(email,title_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.identity.email,req.params.id]);res.status(204).end();});
+app.delete('/my-list/:id',async(req,res)=>{if(!validTitleId(req.params.id))return res.status(400).json({error:'invalid-title'});await pool.query('DELETE FROM watchlist WHERE email=$1 AND title_id=$2',[req.identity.email,req.params.id]);res.status(204).end();});
+app.put('/progress/:id',async(req,res)=>{const seconds=Number(req.body.seconds);if(!validTitleId(req.params.id)||!Number.isFinite(seconds)||seconds<0||seconds>86400)return res.status(400).json({error:'invalid-progress'});await pool.query('INSERT INTO progress(email,title_id,seconds) VALUES($1,$2,$3) ON CONFLICT(email,title_id) DO UPDATE SET seconds=EXCLUDED.seconds,updated_at=now()',[req.identity.email,req.params.id,seconds]);res.status(204).end();});
+app.get('/progress',async(req,res)=>{const {rows}=await pool.query('SELECT title_id,seconds,updated_at FROM progress WHERE email=$1 ORDER BY updated_at DESC',[req.identity.email]);res.json(rows.map(row=>({...row,title_id:Number(row.title_id)})));});
 start([()=>pool.end()]);
