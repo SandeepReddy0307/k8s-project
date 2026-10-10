@@ -1,0 +1,2 @@
+const {defineConfig,devices}=require('@playwright/test');
+module.exports=defineConfig({testDir:'./tests/browser',reporter:[['list'],['html',{open:'never'}]],use:{baseURL:'http://127.0.0.1:18080',trace:'retain-on-failure'},webServer:{command:'node app/frontend/src/index.js',url:'http://127.0.0.1:18080/health',env:{PORT:'18080',COOKIE_SECURE:'false'},reuseExistingServer:false},projects:[{name:'desktop',use:{...devices['Desktop Chrome']}},{name:'mobile',use:{...devices['Pixel 7']}}]});

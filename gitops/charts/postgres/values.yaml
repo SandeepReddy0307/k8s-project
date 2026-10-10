@@ -12,3 +12,23 @@ auth:
   user: postgres
   database: postgres
   existingSecret: postgres-credentials
+
+# Extra databases created automatically on first startup (via an init
+# script mounted from configmap-init.yaml), one per service that needs its
+# own database on this shared Postgres instance.
+initDatabases:
+  - authdb
+  - catalogdb
+  - userdb
+
+# Schedules only onto the node tainted "workload=datastore:NoSchedule" (see
+# scripts/07-taint-datastore-node.sh). Groups all stateful/I/O-heavy workloads
+# (postgres, redis, elasticsearch, kafka) onto one dedicated worker node in
+# this 2-worker kind cluster — a realistic taints/tolerations + node affinity exercise.
+tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "datastore"
+    effect: "NoSchedule"
+nodeAffinity:
+  enabled: true

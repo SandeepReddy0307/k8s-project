@@ -1,0 +1,122 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: dns}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: ingress-to-edge}
+spec:
+  podSelector:
+    matchExpressions: [{key: app.kubernetes.io/name, operator: In, values: [frontend, api-gateway]}]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespace }}}}
+      ports: [{protocol: TCP, port: {{ .Values.servicePort }}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: metrics-scraping}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/part-of: streamflix}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}}}
+      ports: [{protocol: TCP, port: {{ .Values.servicePort }}}]
+{{- $edges := dict "api-gateway" (list "auth-service" "catalog-service" "user-service" "search-service" "recommendation-service" "notification-service" "billing-service" "activity-tracker" "admin-dashboard" "redis") "auth-service" (list "postgres" "redis") "catalog-service" (list "postgres" "kafka") "user-service" (list "postgres") "search-service" (list "catalog-service" "elasticsearch") "recommendation-service" (list "catalog-service" "redis") "notification-service" (list "redis") "billing-service" (list "postgres") "activity-tracker" (list "kafka" "redis") "notification-digest" (list "redis") "postgres-backup" (list "postgres") }}
+{{- $ports := dict "postgres" 5432 "redis" 6379 "kafka" 9092 "elasticsearch" 9200 }}
+{{- range $source,$targets := $edges }}
+{{- range $target := $targets }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: {{ printf "%s-to-%s" $source $target }}}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: {{ $source }}}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app.kubernetes.io/name: {{ $target }}}}}]
+      ports: [{protocol: TCP, port: {{ default $.Values.servicePort (index $ports $target) }}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: {{ printf "%s-from-%s" $target $source }}}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: {{ $target }}}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app.kubernetes.io/name: {{ $source }}}}}]
+      ports: [{protocol: TCP, port: {{ default $.Values.servicePort (index $ports $target) }}}]
+{{- end }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: migration-to-postgres}
+spec:
+  podSelector: {matchLabels: {streamflix.io/migration: "true"}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app.kubernetes.io/name: postgres}}}]
+      ports: [{protocol: TCP, port: 5432}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: postgres-from-migration}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: postgres}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {streamflix.io/migration: "true"}}}]
+      ports: [{protocol: TCP, port: 5432}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: kafka-controller}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: kafka}}
+  policyTypes: [Ingress,Egress]
+  ingress: [{from: [{podSelector: {matchLabels: {app.kubernetes.io/name: kafka}}}], ports: [{protocol: TCP, port: 9093}]}]
+  egress: [{to: [{podSelector: {matchLabels: {app.kubernetes.io/name: kafka}}}], ports: [{protocol: TCP, port: 9093}]}]
+{{- if .Values.endpoints.otlpEndpoint }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: trace-export}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/part-of: streamflix}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}}}}]
+      ports: [{protocol: TCP, port: 4318}]
+{{- end }}
+{{- range $i,$rule := .Values.networkPolicy.externalEgress }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: {{ printf "external-%d" $i }}}
+spec:
+  podSelector: {{ toYaml $rule.podSelector | nindent 4 }}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ipBlock: {cidr: {{ $rule.cidr | quote }}}}]
+      ports: {{ toYaml $rule.ports | nindent 8 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,18 @@
+ipam:
+  mode: kubernetes
+kubeProxyReplacement: false
+operator:
+  replicas: 1
+image:
+  pullPolicy: IfNotPresent
+envoy:
+  enabled: false
+hubble:
+  enabled: true
+  relay:
+    enabled: false
+  ui:
+    enabled: false
+# Permit a later Istio CNI installation without overwriting its configuration.
+cni:
+  exclusive: false

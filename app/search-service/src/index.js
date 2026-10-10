@@ -1,38 +1,8 @@
-const express = require('express');
-const { Client } = require('@elastic/elasticsearch');
-const client = require('prom-client');
-const app = express();
-const PORT = process.env.PORT || 8080;
-const ES_URL = process.env.ES_URL || 'http://elasticsearch:9200';
-const INDEX = 'titles';
-
-const es = new Client({ node: ES_URL });
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
-app.get('/ready', async (_req, res) => {
-  try { await es.ping(); res.json({ status: 'ready' }); }
-  catch (e) { res.status(503).json({ status: 'es-unavailable' }); }
-});
-app.get('/metrics', async (_req, res) => { res.set('Content-Type', register.contentType); res.end(await register.metrics()); });
-
-async function ensureIndex() {
-  const exists = await es.indices.exists({ index: INDEX });
-  if (!exists) {
-    await es.indices.create({ index: INDEX });
-    await es.index({ index: INDEX, document: { name: 'Cluster Wars', genre: 'Sci-Fi' } });
-    await es.indices.refresh({ index: INDEX });
-  }
-}
-
-app.get('/search', async (req, res) => {
-  const q = req.query.q || '';
-  try {
-    const result = await es.search({ index: INDEX, query: { match: { name: q } } });
-    res.json(result.hits.hits.map((h) => h._source));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-ensureIndex()
-  .then(() => app.listen(PORT, () => console.log(`search-service listening on ${PORT}`)))
-  .catch((e) => { console.error('es init failed, continuing anyway', e.message); app.listen(PORT, () => console.log(`search-service listening on ${PORT} (degraded)`)); });
+require('../../shared/tracing');
+const {createApp,required}=require('../../shared/runtime');const {Client}=require('@elastic/elasticsearch');
+const {app,start}=createApp('search-service');const es=new Client({node:required('ES_URL'),auth:{username:required('ES_USERNAME'),password:required('ES_PASSWORD')},requestTimeout:5000});
+app.get('/ready',async(_req,res)=>{await es.ping();res.json({status:'ready'});});
+app.get('/search',async(req,res)=>{const q=String(req.query.q||'').trim();if(q.length>100)return res.status(400).json({error:'query-too-long'});if(!q)return res.json([]);const result=await es.search({index:required('ES_INDEX'),size:30,query:{multi_match:{query:q,fields:['name^3','genre','description'],fuzziness:'AUTO'}}});res.json(result.hits.hits.map(h=>h._source));});
+// Periodic reconciliation keeps the index consistent with the authoritative catalog.
+async function sync(){try{const response=await fetch(`${required('CATALOG_URL')}/titles`,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw new Error('catalog-unavailable');const titles=await response.json();const operations=titles.flatMap(t=>[{index:{_index:required('ES_INDEX'),_id:String(t.id)}},t]);if(operations.length){const result=await es.bulk({operations,refresh:true});if(result.errors)throw new Error('indexing-failed');}}catch{console.error(JSON.stringify({level:'warn',service:'search-service',event:'index-sync-failed'}));}}sync();const timer=setInterval(sync,60000);timer.unref();
+start([()=>es.close()]);

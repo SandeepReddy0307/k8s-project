@@ -13,6 +13,21 @@ spec:
       labels: { app.kubernetes.io/name: postgres }
     spec:
       terminationGracePeriodSeconds: 30
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodeAffinity.enabled }}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: workload
+                    operator: In
+                    values: ["datastore"]
+      {{- end }}
       containers:
         - name: postgres
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -28,6 +43,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
           readinessProbe:
             exec: { command: ["pg_isready", "-U", "postgres"] }
             initialDelaySeconds: 10
@@ -38,6 +55,10 @@ spec:
             periodSeconds: 15
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts
   volumeClaimTemplates:
     - metadata: { name: data }
       spec:

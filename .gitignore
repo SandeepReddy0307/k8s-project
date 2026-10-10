@@ -4,3 +4,10 @@ __pycache__/
 .DS_Store
 *.log
 .env
+
+playwright-report/
+test-results/
+.venv/
+*credentials*.json
+*.pem
+*.key

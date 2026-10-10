@@ -1,15 +1,2 @@
-const { createClient } = require('redis');
-const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379';
-
-(async () => {
-  const redis = createClient({ url: REDIS_URL });
-  await redis.connect();
-  const keys = await redis.keys('notifications:*');
-  console.log(`[digest-cronjob] running at ${new Date().toISOString()}, found ${keys.length} user queues`);
-  for (const key of keys) {
-    const items = await redis.lRange(key, 0, -1);
-    console.log(`  ${key}: ${items.length} pending notifications`);
-  }
-  await redis.quit();
-  process.exit(0);
-})();
+const {createClient}=require('redis');const {required}=require('../../shared/runtime');
+(async()=>{const redis=createClient({url:required('REDIS_URL'),password:required('REDIS_PASSWORD')});await redis.connect();let total=0;for await(const _key of redis.scanIterator({MATCH:'notifications:*',COUNT:100}))total++;console.log(JSON.stringify({event:'notification-digest',queues:total}));await redis.quit();})().catch(()=>process.exit(1));

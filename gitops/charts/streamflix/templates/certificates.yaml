@@ -1,0 +1,28 @@
+{{- if .Values.certificates.enabled }}
+{{- if .Values.ingress.tls }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: streamflix-web
+spec:
+  secretName: {{ .Values.ingress.tlsSecret }}
+  dnsNames: [{{ .Values.ingress.host | quote }}]
+  privateKey: {rotationPolicy: Always}
+  issuerRef: {name: {{ .Values.certificates.issuerName }}, kind: {{ .Values.certificates.issuerKind }}}
+{{- end }}
+{{- if and .Values.infrastructure.enabled .Values.certificates.databaseTls }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: streamflix-postgres
+spec:
+  secretName: {{ .Values.certificates.postgresSecret }}
+  dnsNames:
+    - postgres
+    - {{ include "streamflix.dns" (dict "name" "postgres" "root" .) }}
+  privateKey: {rotationPolicy: Always}
+  issuerRef: {name: {{ .Values.certificates.issuerName }}, kind: {{ .Values.certificates.issuerKind }}}
+{{- end }}
+{{- end }}

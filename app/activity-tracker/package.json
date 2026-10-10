@@ -1,0 +1,15 @@
+{
+  "name": "activity-tracker",
+  "version": "2.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "4.22.3",
+    "kafkajs": "2.2.4",
+    "redis": "4.6.14",
+    "prom-client": "15.1.0"
+  }
+}

@@ -1,0 +1,12 @@
+profile: learning
+ingress:
+  className: traefik
+  host: streamflix-v2.local
+  publicOrigin: https://streamflix-v2.local:9443
+monitoring:
+  enabled: true
+endpoints:
+  otlpEndpoint: http://tempo.observability.svc.cluster.local:4318
+vpa: {enabled: true}
+networkPolicy:
+  ingressNamespace: ingress-system

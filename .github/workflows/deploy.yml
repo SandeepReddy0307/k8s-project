@@ -1,0 +1,25 @@
+name: Deploy reviewed StreamFlix release
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        type: choice
+        options: [learning, production]
+        default: learning
+permissions: {contents: read}
+concurrency:
+  group: streamflix-deploy-${{ inputs.profile }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    # This runner must have a restricted, short-lived Kubernetes identity.
+    # GitHub-hosted runners cannot reach the existing local kind cluster.
+    runs-on: [self-hosted, linux, streamflix]
+    environment: ${{ inputs.profile }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Deploy immutable release
+        env:
+          PROFILE: ${{ inputs.profile }}
+          STREAMFLIX_NAMESPACE: ${{ vars.STREAMFLIX_NAMESPACE }}
+        run: bash scripts/v2/deploy.sh "$PROFILE"

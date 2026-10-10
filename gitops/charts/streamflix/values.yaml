@@ -1,0 +1,108 @@
+profile: learning
+images:
+  registry: ghcr.io
+  owner: ""
+  tag: ""
+  digests: {}
+imagePullSecrets: []
+servicePort: 8080
+clusterDomain: cluster.local
+replicas: 2
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: 500m, memory: 384Mi}
+services:
+  frontend: {replicas: 2}
+  api-gateway: {replicas: 2, redis: true, jwt: true}
+  auth-service: {replicas: 2, database: authdb, redis: true, jwt: true}
+  catalog-service: {replicas: 2, database: catalogdb, kafka: true, jwt: true}
+  user-service: {replicas: 2, database: userdb, jwt: true}
+  search-service: {replicas: 1, elastic: true, jwt: true}
+  recommendation-service: {replicas: 2, redis: true}
+  notification-service: {replicas: 2, redis: true, jwt: true}
+  billing-service: {replicas: 2, database: billingdb, jwt: true, payment: true}
+  activity-tracker: {replicas: 1, redis: true, kafka: true, jwt: true}
+  admin-dashboard: {replicas: 1, jwt: true}
+adminEmails: []
+# Secret names only. Values must never contain passwords/tokens.
+secrets:
+  jwt: streamflix-jwt
+  redis: streamflix-redis
+  elastic: streamflix-elastic
+  payment: streamflix-payment
+  postgresAdmin: streamflix-postgres-admin
+  databases:
+    auth-service: streamflix-auth-db
+    catalog-service: streamflix-catalog-db
+    user-service: streamflix-user-db
+    billing-service: streamflix-billing-db
+externalSecrets:
+  enabled: false
+  storeName: streamflix-vault
+  storeKind: ClusterSecretStore
+  remotePrefix: streamflix/production
+endpoints:
+  postgresHost: "" # Blank: derive the in-cluster Service DNS name.
+  postgresPort: 5432
+  redisUrl: ""
+  elasticUrl: ""
+  kafkaBrokers: ""
+  kafkaSsl: false
+  kafkaTopic: title-viewed
+  kafkaAuthSecret: ""
+  elasticIndex: streamflix-titles
+  otlpEndpoint: ""
+ingress:
+  enabled: true
+  className: traefik
+  host: streamflix.local
+  publicOrigin: "" # Blank derives https://<host>; set only for nonstandard ingress ports.
+  tls: true
+  tlsSecret: streamflix-web-tls
+certificates:
+  enabled: true
+  mode: local-ca # production: existing-issuer
+  issuerName: streamflix-ca
+  issuerKind: ClusterIssuer
+  trustConfigMap: streamflix-db-ca
+  postgresSecret: streamflix-postgres-tls
+  databaseTls: true
+infrastructure:
+  enabled: true
+  storageClass: standard
+  postgres: {image: "postgres:16-alpine", size: 5Gi}
+  redis: {image: "redis:7.4-alpine", size: 2Gi}
+  elastic: {image: "docker.elastic.co/elasticsearch/elasticsearch:8.17.6", size: 5Gi}
+  kafka: {image: "apache/kafka:3.9.1", size: 5Gi}
+  tolerations:
+    - {key: workload, operator: Equal, value: datastore, effect: NoSchedule}
+mesh:
+  enabled: false # Production requires Istio + Istio CNI installed by platform administrators.
+networkPolicy:
+  enabled: true
+  monitoringNamespace: observability
+  ingressNamespace: ingress-system
+  # External endpoints require explicit destinations in the production overlay.
+  externalEgress: []
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPU: 65
+vpa:
+  enabled: false # Requires VPA CRDs; recommendations only, no automatic updates.
+monitoring:
+  enabled: false # Requires Prometheus Operator CRDs.
+  release: kube-prometheus-stack
+jobs:
+  enabled: true
+  digestSchedule: "0 8 * * *"
+  backupSchedule: "0 2 * * *"
+  backupSize: 10Gi
+  encodeSchedule: "0 3 * * *"
+quota:
+  enabled: true
+  requestsCpu: "8"
+  requestsMemory: 12Gi
+  limitsCpu: "20"
+  limitsMemory: 24Gi

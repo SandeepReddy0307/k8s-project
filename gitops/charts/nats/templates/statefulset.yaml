@@ -14,7 +14,7 @@ spec:
       containers:
         - name: nats
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          args: ["-js", "-sd", "/data"]
+          args: ["-js", "-sd", "/data", "-m", "8222"]
           ports: [{ containerPort: 4222 }, { containerPort: 8222 }]
           volumeMounts: [{ name: data, mountPath: /data }]
           readinessProbe:

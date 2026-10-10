@@ -11,6 +11,21 @@ spec:
     metadata:
       labels: { app.kubernetes.io/name: elasticsearch }
     spec:
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodeAffinity.enabled }}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: workload
+                    operator: In
+                    values: ["datastore"]
+      {{- end }}
       initContainers:
         - name: fix-permissions
           image: busybox

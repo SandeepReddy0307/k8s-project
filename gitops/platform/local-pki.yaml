@@ -1,0 +1,41 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: streamflix-selfsigned
+  namespace: cert-manager
+  annotations: {argocd.argoproj.io/sync-wave: "-4"}
+spec: {selfSigned: {}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: streamflix-root
+  namespace: cert-manager
+  annotations: {argocd.argoproj.io/sync-wave: "-3"}
+spec:
+  isCA: true
+  commonName: StreamFlix Learning Root CA
+  secretName: streamflix-root-ca
+  duration: 8760h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  issuerRef: {name: streamflix-selfsigned, kind: Issuer}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: streamflix-ca
+  annotations: {argocd.argoproj.io/sync-wave: "-2"}
+spec: {ca: {secretName: streamflix-root-ca}}
+---
+# trust-manager distributes only the public CA, never the signing private key.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: streamflix-db-ca
+spec:
+  sources:
+    - secret: {name: streamflix-root-ca, key: tls.crt}
+  target:
+    configMap: {key: ca.crt}
+    namespaceSelector:
+      matchLabels: {streamflix.io/trust: "true"}

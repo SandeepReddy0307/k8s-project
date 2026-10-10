@@ -8,3 +8,11 @@ storage:
 resources:
   requests: { cpu: 50m, memory: 64Mi }
   limits: { cpu: 250m, memory: 256Mi }
+
+tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "datastore"
+    effect: "NoSchedule"
+nodeAffinity:
+  enabled: true

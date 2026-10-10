@@ -1,0 +1,18 @@
+{{- if .Values.mesh.enabled }}
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata: {name: streamflix-strict}
+spec:
+  mtls: {mode: STRICT}
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata: {name: streamflix-mtls}
+spec:
+  host: {{ printf "*.%s.svc.%s" .Release.Namespace .Values.clusterDomain | quote }}
+  trafficPolicy:
+    tls: {mode: ISTIO_MUTUAL}
+    connectionPool:
+      tcp: {maxConnections: 100}
+      http: {http1MaxPendingRequests: 100, maxRequestsPerConnection: 100}
+{{- end }}

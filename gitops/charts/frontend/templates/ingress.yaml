@@ -11,6 +11,24 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
+          {{- if .Values.ingress.api.enabled }}
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ingress.api.serviceName }}
+                port:
+                  number: {{ .Values.ingress.api.servicePort }}
+          {{- end }}
+          {{- if .Values.ingress.admin.enabled }}
+          - path: /pods
+            pathType: Exact
+            backend:
+              service:
+                name: {{ .Values.ingress.admin.serviceName }}
+                port:
+                  number: {{ .Values.ingress.admin.servicePort }}
+          {{- end }}
           - path: /
             pathType: Prefix
             backend:

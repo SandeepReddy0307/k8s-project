@@ -1,0 +1,66 @@
+version: 2
+updates:
+- package-ecosystem: npm
+  directory: /
+  schedule:
+    interval: weekly
+  groups:
+    runtime:
+      patterns:
+      - '*'
+- package-ecosystem: pip
+  directory: /app/recommendation-service
+  schedule:
+    interval: weekly
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/activity-tracker
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/admin-dashboard
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/api-gateway
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/auth-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/billing-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/catalog-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/frontend
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/notification-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/recommendation-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/search-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/user-service
+  schedule:
+    interval: weekly
+- package-ecosystem: docker
+  directory: /app/video-encoder-job
+  schedule:
+    interval: weekly

@@ -1,7 +1,10 @@
 image:
   repository: fluent/fluent-bit
   tag: "3.1.4"
-lokiUrl: "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+loki:
+  host: loki.observability.svc.cluster.local
+  port: 3100
+  uri: /loki/api/v1/push
 resources:
   requests: { cpu: 50m, memory: 64Mi }
   limits: { cpu: 200m, memory: 128Mi }

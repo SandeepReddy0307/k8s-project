@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streamflix-v2-loki-datasource
+  namespace: observability
+  labels: {grafana_datasource: "1"}
+data:
+  loki-v2.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki v2
+        uid: streamflix-loki-v2
+        type: loki
+        access: proxy
+        url: http://loki-v2-gateway.observability-v2.svc.cluster.local
+        jsonData: {maxLines: 1000}

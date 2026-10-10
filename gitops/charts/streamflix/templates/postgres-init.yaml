@@ -1,0 +1,38 @@
+{{- if .Values.infrastructure.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  annotations: {argocd.argoproj.io/sync-wave: "-2"}
+data:
+  00-databases.sh: |
+    #!/bin/sh
+    set -eu
+    export PGPASSWORD="$POSTGRES_PASSWORD"
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    \getenv auth_user AUTH_DB_USER
+    \getenv auth_password AUTH_DB_PASSWORD
+    CREATE ROLE :"auth_user" LOGIN PASSWORD :'auth_password';
+    CREATE DATABASE authdb OWNER :"auth_user";
+    REVOKE CONNECT ON DATABASE authdb FROM PUBLIC;
+    GRANT CONNECT ON DATABASE authdb TO :"auth_user";
+    \getenv catalog_user CATALOG_DB_USER
+    \getenv catalog_password CATALOG_DB_PASSWORD
+    CREATE ROLE :"catalog_user" LOGIN PASSWORD :'catalog_password';
+    CREATE DATABASE catalogdb OWNER :"catalog_user";
+    REVOKE CONNECT ON DATABASE catalogdb FROM PUBLIC;
+    GRANT CONNECT ON DATABASE catalogdb TO :"catalog_user";
+    \getenv user_user USER_DB_USER
+    \getenv user_password USER_DB_PASSWORD
+    CREATE ROLE :"user_user" LOGIN PASSWORD :'user_password';
+    CREATE DATABASE userdb OWNER :"user_user";
+    REVOKE CONNECT ON DATABASE userdb FROM PUBLIC;
+    GRANT CONNECT ON DATABASE userdb TO :"user_user";
+    \getenv billing_user BILLING_DB_USER
+    \getenv billing_password BILLING_DB_PASSWORD
+    CREATE ROLE :"billing_user" LOGIN PASSWORD :'billing_password';
+    CREATE DATABASE billingdb OWNER :"billing_user";
+    REVOKE CONNECT ON DATABASE billingdb FROM PUBLIC;
+    GRANT CONNECT ON DATABASE billingdb TO :"billing_user";
+    SQL
+{{- end }}

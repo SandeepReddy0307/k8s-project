@@ -1,0 +1,26 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: streamflix-v2-alerts
+  labels: {release: {{ .Values.monitoring.release }}}
+spec:
+  groups:
+    - name: streamflix-v2
+      rules:
+        - alert: StreamFlixHighErrorRate
+          expr: {{ printf "sum(rate(http_requests_total{namespace=%q,status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total{namespace=%q}[5m])), 0.001) > 0.05" .Release.Namespace .Release.Namespace | quote }}
+          for: 5m
+          labels: {severity: warning}
+          annotations: {summary: "StreamFlix HTTP error rate exceeds 5%"}
+        - alert: StreamFlixContainerRestarts
+          expr: {{ printf "increase(kube_pod_container_status_restarts_total{namespace=%q}[10m]) > 3" .Release.Namespace | quote }}
+          for: 5m
+          labels: {severity: warning}
+          annotations: {summary: "A StreamFlix container is restarting repeatedly"}
+        - alert: StreamFlixUnavailable
+          expr: {{ printf "kube_deployment_status_replicas_available{namespace=%q} == 0" .Release.Namespace | quote }}
+          for: 2m
+          labels: {severity: critical}
+          annotations: {summary: "A StreamFlix deployment has no available replicas"}
+{{- end }}

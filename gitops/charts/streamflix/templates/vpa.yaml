@@ -1,0 +1,13 @@
+{{- if .Values.vpa.enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata: {name: billing-service-recommendations}
+spec:
+  targetRef: {apiVersion: apps/v1, kind: Deployment, name: billing-service}
+  updatePolicy: {updateMode: "Off"}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: billing-service
+        minAllowed: {cpu: 50m, memory: 64Mi}
+        maxAllowed: {cpu: "1", memory: 1Gi}
+{{- end }}

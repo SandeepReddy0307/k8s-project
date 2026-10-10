@@ -1,0 +1,123 @@
+name: Validate and publish StreamFlix
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ["app/**", "tests/**", "package*.json", "scripts/v2/**", ".github/**", "gitops/charts/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: streamflix-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: '22', cache: npm}
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with: {version: v3.22.0}
+      - run: npm ci --ignore-scripts
+      - run: python3 -m pip install PyYAML==6.0.2
+      - run: npm test
+      - run: node scripts/v2/integration.mjs
+      - run: python3 scripts/v2/validate.py
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with: {name: browser-report, path: playwright-report/, retention-days: 7}
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install -r app/recommendation-service/requirements.txt pip-audit
+      - run: python tests/recommendation_test.py
+      - run: pip-audit -r app/recommendation-service/requirements.txt
+  build:
+    needs: [validate, python]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [frontend, api-gateway, auth-service, catalog-service, user-service, search-service, recommendation-service, notification-service, billing-service, admin-dashboard, activity-tracker, video-encoder-job]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Registry owner
+        id: registry
+        env: {OWNER: '${{ github.repository_owner }}'}
+        run: echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: image
+        with:
+          context: .
+          file: app/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.registry.outputs.owner }}/${{ matrix.service }}:${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ steps.registry.outputs.owner }}/${{ matrix.service }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+      - name: Image vulnerability gate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.registry.outputs.owner }}/${{ matrix.service }}@${{ steps.image.outputs.digest }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+        env: {TRIVY_USERNAME: '${{ github.actor }}', TRIVY_PASSWORD: '${{ secrets.GITHUB_TOKEN }}'}
+      - name: Record verified image
+        env: {SERVICE: '${{ matrix.service }}', DIGEST: '${{ steps.image.outputs.digest }}'}
+        run: |
+          mkdir -p digests
+          python3 -c 'import os,json; json.dump({os.environ["SERVICE"]:os.environ["DIGEST"]},open("digests/"+os.environ["SERVICE"]+".json","w"))'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: 'digest-${{ matrix.service }}', path: digests/*.json}
+  promotion:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {contents: write, pull-requests: write}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {pattern: 'digest-*', path: digests, merge-multiple: true}
+      - run: python3 -m pip install PyYAML==6.0.2
+      - name: Prepare release manifest
+        env: {OWNER: '${{ github.repository_owner }}', RELEASE_SHA: '${{ github.sha }}'}
+        run: |
+          python3 scripts/v2/promote.py
+      - name: Create reviewable promotion PR
+        env: {GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}', RELEASE_SHA: '${{ github.sha }}'}
+        run: |
+          branch="release/streamflix-${RELEASE_SHA}"
+          git switch -c "$branch"
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add gitops/environments/images.yaml
+          git diff --cached --quiet && exit 0
+          git commit -m "Promote verified StreamFlix images"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Promote StreamFlix ${RELEASE_SHA:0:12}" --body-file docs/v2/promotion-pr.md

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: streamflix
+description: StreamFlix v2 application platform, learning infrastructure and production integrations
+version: 2.0.0
+appVersion: "2.0.0"
+type: application

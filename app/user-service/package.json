@@ -1,12 +1,14 @@
 {
   "name": "user-service",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "main": "src/index.js",
-  "scripts": { "start": "node src/index.js" },
+  "scripts": {
+    "start": "node src/index.js"
+  },
   "dependencies": {
-    "express": "^4.19.2",
-    "pg": "^8.11.5",
-    "prom-client": "^15.1.0"
+    "express": "4.22.3",
+    "pg": "8.11.5",
+    "prom-client": "15.1.0"
   }
 }

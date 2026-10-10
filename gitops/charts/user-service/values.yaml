@@ -1,6 +1,6 @@
 image:
-  repository: localhost:5000/user-service
-  tag: latest
+  repository: docker.io/sandeep030701/user-service
+  tag: v1
   pullPolicy: IfNotPresent
 
 replicaCount: 2
@@ -35,6 +35,18 @@ probes:
 serviceAccount:
   create: true
   name: ""
+
+# Node selection (optional, empty by default). Set in a service's own
+# values.yaml to pin it to a labeled node pool — see docs/04 for the
+# kind node labels (zone: zone-a / zone-b) created by infra/kind/kind-config.yaml.
+nodeSelector: {}
+
+# Tolerations (optional, empty by default). Needed only if this workload must
+# schedule onto a tainted node (see the stateful charts: postgres, redis,
+# elasticsearch, kafka, which tolerate the "workload=datastore:NoSchedule" taint).
+tolerations: []
+
+affinity: {}
 
 persistence:
   enabled: true

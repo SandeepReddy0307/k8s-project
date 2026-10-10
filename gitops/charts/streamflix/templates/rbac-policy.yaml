@@ -1,0 +1,38 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: streamflix-pod-reader}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: streamflix-admin}
+subjects:
+  - {kind: ServiceAccount, name: admin-dashboard, namespace: {{ .Release.Namespace }}}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: streamflix-pod-reader}
+---
+apiVersion: v1
+kind: LimitRange
+metadata: {name: streamflix-defaults}
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 500m, memory: 512Mi}
+      defaultRequest: {cpu: 100m, memory: 128Mi}
+{{- if .Values.quota.enabled }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata: {name: streamflix-budget}
+spec:
+  hard:
+    requests.cpu: {{ .Values.quota.requestsCpu | quote }}
+    requests.memory: {{ .Values.quota.requestsMemory }}
+    limits.cpu: {{ .Values.quota.limitsCpu | quote }}
+    limits.memory: {{ .Values.quota.limitsMemory }}
+    pods: "100"
+    services: "30"
+    persistentvolumeclaims: "12"
+{{- end }}

@@ -1,0 +1,42 @@
+# StreamFlix v2 learning cluster. Install Cilium before waiting for Ready nodes.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: streamflix-v2
+networking:
+  disableDefaultCNI: true
+  podSubnet: 10.244.0.0/16
+kubeadmConfigPatches:
+  - |
+    apiVersion: kubeadm.k8s.io/v1beta4
+    kind: ClusterConfiguration
+    controllerManager:
+      extraArgs:
+        - name: bind-address
+          value: 0.0.0.0
+    scheduler:
+      extraArgs:
+        - name: bind-address
+          value: 0.0.0.0
+    etcd:
+      local:
+        extraArgs:
+          - name: listen-metrics-urls
+            value: http://0.0.0.0:2381
+  - |
+    apiVersion: kubeproxy.config.k8s.io/v1alpha1
+    kind: KubeProxyConfiguration
+    metricsBindAddress: 0.0.0.0:10249
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+    labels:
+      ingress-ready: "true"
+  - role: worker
+    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+    labels:
+      topology.kubernetes.io/zone: zone-a
+  - role: worker
+    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+    labels:
+      topology.kubernetes.io/zone: zone-b
+      workload: datastore

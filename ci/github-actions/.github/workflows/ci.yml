@@ -33,6 +33,7 @@ jobs:
           - billing-service
           - admin-dashboard
           - video-encoder-job
+          - activity-tracker
     steps:
       - uses: actions/checkout@v4
 

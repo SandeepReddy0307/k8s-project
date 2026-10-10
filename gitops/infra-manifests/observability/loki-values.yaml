@@ -5,7 +5,19 @@ loki:
     size: 2Gi
 promtail:
   enabled: true
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: workload
+      operator: Equal
+      value: datastore
+      effect: NoSchedule
   config:
-    lokiAddress: http://loki:3100/loki/api/v1/push
+    clients:
+      - url: http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
 grafana:
   enabled: false   # we already have Grafana from kube-prometheus-stack

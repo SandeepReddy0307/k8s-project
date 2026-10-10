@@ -1,0 +1,13 @@
+profile: production
+infrastructure: {enabled: false}
+certificates:
+  mode: existing-issuer
+  issuerName: letsencrypt-production
+  issuerKind: ClusterIssuer
+  trustConfigMap: production-db-ca
+externalSecrets: {enabled: true}
+endpoints:
+  kafkaSsl: true
+# Supply domain, endpoints, egress CIDRs, public DB CA and secret-store identity
+# through a reviewed environment overlay. Production rendering fails until set.
+mesh: {enabled: true}

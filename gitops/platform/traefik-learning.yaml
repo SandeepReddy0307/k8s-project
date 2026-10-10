@@ -1,0 +1,37 @@
+deployment:
+  replicas: 1
+service:
+  spec:
+    type: ClusterIP
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  name: traefik
+providers:
+  kubernetesIngress:
+    enabled: true
+    ingressClass: traefik
+    publishedService:
+      enabled: false
+nodeSelector:
+  ingress-ready: "true"
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+ports:
+  web:
+    hostPort: null
+  websecure:
+    hostPort: null
+log:
+  format: json
+accessLog:
+  enabled: true
+  format: json
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 384Mi

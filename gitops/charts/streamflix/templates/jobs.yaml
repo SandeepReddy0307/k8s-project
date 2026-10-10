@@ -1,0 +1,168 @@
+{{- range $name,$service := .Values.services }}
+{{- if $service.database }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-migrate-%s" $name (sha256sum $.Values.images.tag | trunc 8) }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: {{ $name }}, streamflix.io/migration: "true", app.kubernetes.io/part-of: streamflix}
+    spec:
+      restartPolicy: Never
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: {{ include "streamflix.image" (dict "root" $ "name" $name "service" $service "migration" true) | quote }}
+          command: [node, app/shared/migrate.js]
+          envFrom: [{configMapRef: {name: streamflix-config}}]
+          env: {{ include "streamflix.env" (dict "root" $ "name" $name "service" $service "migration" true) | nindent 12 }}
+          securityContext: {{ include "streamflix.security" . | nindent 12 }}
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+          {{- if $.Values.certificates.databaseTls }}
+          volumeMounts: [{name: db-ca, mountPath: /etc/db-ca, readOnly: true}]
+      volumes: [{name: db-ca, configMap: {name: {{ $.Values.certificates.trustConfigMap }}}}]
+          {{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.jobs.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: notification-digest}
+spec:
+  schedule: {{ .Values.jobs.digestSchedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: notification-digest, app.kubernetes.io/part-of: streamflix}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          automountServiceAccountToken: false
+          securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: digest
+              image: {{ include "streamflix.image" (dict "root" . "name" "notification-service") | quote }}
+              command: [node, app/notification-service/src/digest.js]
+              envFrom: [{configMapRef: {name: streamflix-config}}]
+              env:
+                - name: REDIS_PASSWORD
+                  valueFrom: {secretKeyRef: {name: {{ .Values.secrets.redis }}, key: password}}
+              securityContext: {{ include "streamflix.security" . | nindent 16 }}
+              resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 250m, memory: 128Mi}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: video-encoder}
+spec:
+  schedule: {{ .Values.jobs.encodeSchedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: video-encoder, app.kubernetes.io/part-of: streamflix}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          automountServiceAccountToken: false
+          securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: encode
+              image: {{ include "streamflix.image" (dict "root" . "name" "video-encoder-job") | quote }}
+              securityContext: {{ include "streamflix.security" . | nindent 16 }}
+              resources: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: 500m, memory: 128Mi}}
+{{- if .Values.infrastructure.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: postgres-backups}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ .Values.infrastructure.storageClass }}
+  resources: {requests: {storage: {{ .Values.jobs.backupSize }}}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: postgres-backup}
+spec:
+  schedule: {{ .Values.jobs.backupSchedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: postgres-backup, app.kubernetes.io/part-of: streamflix}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          automountServiceAccountToken: false
+          securityContext: {runAsNonRoot: true, runAsUser: 70, runAsGroup: 70, fsGroup: 70, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: backup
+              image: {{ .Values.infrastructure.postgres.image | quote }}
+              command: [sh, -c]
+              args:
+                - |
+                  set -eu
+                  umask 077
+                  pg_dumpall --no-password > /backups/cluster-$(date -u +%Y%m%dT%H%M%SZ).sql
+                  find /backups -type f -name 'cluster-*.sql' -mtime +7 -delete
+              env:
+                - {name: PGHOST, value: {{ include "streamflix.dns" (dict "name" "postgres" "root" .) | quote }}}
+                - {name: PGSSLMODE, value: {{ ternary "verify-full" "disable" .Values.certificates.databaseTls }}}
+                - {name: PGSSLROOTCERT, value: /etc/db-ca/ca.crt}
+                - name: PGUSER
+                  valueFrom: {secretKeyRef: {name: {{ .Values.secrets.postgresAdmin }}, key: username}}
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: {{ .Values.secrets.postgresAdmin }}, key: password}}
+              securityContext: {{ include "streamflix.security" . | nindent 16 }}
+              resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+              volumeMounts:
+                - {name: backup, mountPath: /backups}
+                {{- if .Values.certificates.databaseTls }}
+                - {name: db-ca, mountPath: /etc/db-ca, readOnly: true}
+                {{- end }}
+          volumes:
+            - {name: backup, persistentVolumeClaim: {claimName: postgres-backups}}
+            {{- if .Values.certificates.databaseTls }}
+            - {name: db-ca, configMap: {name: {{ .Values.certificates.trustConfigMap }}}}
+            {{- end }}
+{{- end }}
+{{- end }}

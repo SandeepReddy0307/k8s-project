@@ -1,0 +1,42 @@
+{{- if eq .Values.profile "production" }}
+{{- if or (not .Values.externalSecrets.enabled) (not .Values.networkPolicy.enabled) (not .Values.networkPolicy.externalEgress) -}}
+{{- fail "Production requires External Secrets and explicitly permitted external egress destinations" -}}
+{{- end }}
+{{- if or (not .Values.endpoints.postgresHost) (not .Values.endpoints.redisUrl) (not .Values.endpoints.elasticUrl) (not .Values.endpoints.kafkaBrokers) (not .Values.endpoints.kafkaAuthSecret) -}}
+{{- fail "Production requires explicit external datastore endpoints and a Kafka SASL Secret reference" -}}
+{{- end }}
+{{- if or (not (hasPrefix "rediss://" .Values.endpoints.redisUrl)) (not (hasPrefix "https://" .Values.endpoints.elasticUrl)) (hasSuffix ".local" .Values.ingress.host) (not .Values.mesh.enabled) -}}
+{{- fail "Production requires Redis/Elasticsearch TLS, a real ingress domain, and strict service-mesh mTLS" -}}
+{{- end }}
+{{- if not (index .Values.images.digests "video-encoder-job") -}}{{- fail "Production requires an encoder image digest" -}}{{- end }}
+{{- range $name,$service := .Values.services }}
+{{- if not (index $.Values.images.digests $name) -}}{{- fail "Production requires a digest for every application image" -}}{{- end }}
+{{- end }}
+{{- end }}
+{{- if and (eq .Values.profile "production") .Values.infrastructure.enabled }}
+{{- fail "Production requires managed/external data services; set infrastructure.enabled=false" }}
+{{- end }}
+{{- if and (eq .Values.profile "production") (or (not .Values.ingress.tls) (not .Values.certificates.databaseTls) (not .Values.endpoints.kafkaSsl)) }}
+{{- fail "Production requires ingress TLS, database TLS, and Kafka TLS" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streamflix-config
+  annotations: {argocd.argoproj.io/sync-wave: "-2"}
+data:
+  DB_HOST: {{ default (include "streamflix.dns" (dict "name" "postgres" "root" .)) .Values.endpoints.postgresHost | quote }}
+  DB_PORT: {{ .Values.endpoints.postgresPort | quote }}
+  DB_SSL: {{ .Values.certificates.databaseTls | quote }}
+  DB_CA_FILE: /etc/db-ca/ca.crt
+  REDIS_URL: {{ default (printf "redis://%s:6379" (include "streamflix.dns" (dict "name" "redis" "root" .))) .Values.endpoints.redisUrl | quote }}
+  ES_URL: {{ default (printf "http://%s:9200" (include "streamflix.dns" (dict "name" "elasticsearch" "root" .))) .Values.endpoints.elasticUrl | quote }}
+  ES_INDEX: {{ .Values.endpoints.elasticIndex | quote }}
+  KAFKA_BROKERS: {{ default (printf "%s:9092" (include "streamflix.dns" (dict "name" "kafka" "root" .))) .Values.endpoints.kafkaBrokers | quote }}
+  KAFKA_SSL: {{ .Values.endpoints.kafkaSsl | quote }}
+  KAFKA_TOPIC: {{ .Values.endpoints.kafkaTopic | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.endpoints.otlpEndpoint | quote }}
+  ADMIN_EMAILS: {{ join "," .Values.adminEmails | quote }}
+  {{- range $env, $service := dict "AUTH_URL" "auth-service" "CATALOG_URL" "catalog-service" "USER_URL" "user-service" "SEARCH_URL" "search-service" "RECO_URL" "recommendation-service" "NOTIF_URL" "notification-service" "BILLING_URL" "billing-service" "ACTIVITY_URL" "activity-tracker" "ADMIN_URL" "admin-dashboard" }}
+  {{ $env }}: {{ printf "http://%s:%v" (include "streamflix.dns" (dict "name" $service "root" $)) $.Values.servicePort | quote }}
+  {{- end }}

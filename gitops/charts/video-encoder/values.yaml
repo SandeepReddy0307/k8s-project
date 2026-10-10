@@ -1,6 +1,6 @@
 image:
-  repository: localhost:5000/video-encoder-job
-  tag: latest
+  repository: docker.io/sandeep030701/video-encoder-job
+  tag: v1
 cronSchedule: "0 2 * * *"   # nightly at 2am
 resources:
   requests: { cpu: 100m, memory: 64Mi }

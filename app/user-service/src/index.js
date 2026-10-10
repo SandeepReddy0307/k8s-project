@@ -1,62 +1,13 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { Pool } = require('pg');
-const client = require('prom-client');
-const app = express();
-app.use(express.json());
-const PORT = process.env.PORT || 8080;
-const AVATAR_DIR = process.env.AVATAR_DIR || '/data/avatars'; // backed by PVC
-
-const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'userdb',
-});
-
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
-app.get('/ready', async (_req, res) => {
-  try {
-    await pool.query('SELECT 1');
-    fs.mkdirSync(AVATAR_DIR, { recursive: true });
-    res.json({ status: 'ready' });
-  } catch (e) { res.status(503).json({ status: 'not-ready', error: e.message }); }
-});
-app.get('/metrics', async (_req, res) => { res.set('Content-Type', register.contentType); res.end(await register.metrics()); });
-
-async function ensureSchema() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS profiles (
-    id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, display_name TEXT
-  )`);
-}
-
-app.post('/profiles', async (req, res) => {
-  const { email, display_name } = req.body;
-  const r = await pool.query(
-    'INSERT INTO profiles(email, display_name) VALUES ($1,$2) ON CONFLICT (email) DO UPDATE SET display_name=$2 RETURNING *',
-    [email, display_name]
-  );
-  res.status(201).json(r.rows[0]);
-});
-
-app.get('/profiles/:email', async (req, res) => {
-  const r = await pool.query('SELECT * FROM profiles WHERE email=$1', [req.params.email]);
-  if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
-  res.json(r.rows[0]);
-});
-
-// demonstrates PVC usage: write/read a note file per user under the persistent volume
-app.post('/profiles/:email/note', (req, res) => {
-  fs.mkdirSync(AVATAR_DIR, { recursive: true });
-  const file = path.join(AVATAR_DIR, `${req.params.email}.txt`);
-  fs.writeFileSync(file, req.body.note || '');
-  res.json({ saved: file });
-});
-
-ensureSchema()
-  .then(() => app.listen(PORT, () => console.log(`user-service listening on ${PORT}`)))
-  .catch((e) => { console.error('schema init failed', e.message); setTimeout(() => process.exit(1), 5000); });
+require('../../shared/tracing');
+const {createApp,database,requireIdentity}=require('../../shared/runtime');
+const {app,start}=createApp('user-service');const pool=database();
+app.get('/ready',async(_req,res)=>{await pool.query('SELECT 1 FROM profiles LIMIT 1');res.json({status:'ready'});});
+app.use(requireIdentity);
+app.get('/profile',async(req,res)=>{const {rows}=await pool.query('SELECT email,display_name FROM profiles WHERE email=$1',[req.identity.email]);res.json(rows[0]||{email:req.identity.email,display_name:req.identity.email.split('@')[0]});});
+app.put('/profile',async(req,res)=>{const name=req.body.display_name;if(typeof name!=='string'||name.trim().length<1||name.length>64)return res.status(400).json({error:'invalid-name'});const {rows}=await pool.query('INSERT INTO profiles(email,display_name) VALUES($1,$2) ON CONFLICT(email) DO UPDATE SET display_name=EXCLUDED.display_name RETURNING email,display_name',[req.identity.email,name.trim()]);res.json(rows[0]);});
+app.get('/my-list',async(req,res)=>{const {rows}=await pool.query('SELECT title_id FROM watchlist WHERE email=$1 ORDER BY created_at DESC',[req.identity.email]);res.json(rows.map(r=>r.title_id));});
+app.put('/my-list/:id',async(req,res)=>{if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:'invalid-title'});await pool.query('INSERT INTO watchlist(email,title_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.identity.email,req.params.id]);res.status(204).end();});
+app.delete('/my-list/:id',async(req,res)=>{if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:'invalid-title'});await pool.query('DELETE FROM watchlist WHERE email=$1 AND title_id=$2',[req.identity.email,req.params.id]);res.status(204).end();});
+app.put('/progress/:id',async(req,res)=>{const seconds=Number(req.body.seconds);if(!/^\d+$/.test(req.params.id)||!Number.isFinite(seconds)||seconds<0||seconds>86400)return res.status(400).json({error:'invalid-progress'});await pool.query('INSERT INTO progress(email,title_id,seconds) VALUES($1,$2,$3) ON CONFLICT(email,title_id) DO UPDATE SET seconds=EXCLUDED.seconds,updated_at=now()',[req.identity.email,req.params.id,seconds]);res.status(204).end();});
+app.get('/progress',async(req,res)=>{const {rows}=await pool.query('SELECT title_id,seconds,updated_at FROM progress WHERE email=$1 ORDER BY updated_at DESC',[req.identity.email]);res.json(rows);});
+start([()=>pool.end()]);
