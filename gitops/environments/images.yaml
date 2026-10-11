@@ -1,6 +1,17 @@
-# GitHub Actions creates a promotion PR replacing this file with image digests.
 images:
   registry: docker.io
-  owner: ""
-  tag: ""
-  digests: {}
+  owner: sandeep030701
+  tag: abf418f2760641f37728fff426d3044c029edb07
+  digests:
+    user-service: sha256:f55a25a04ea23fcc9adf6a3b69cadd8eb5c3f1c619cf4aeb233dcd25002a9721
+    auth-service: sha256:da5feae1554a45215da95108725ceaeeaefa3cd851fdc7c7fb6281a756beff72
+    catalog-service: sha256:e2c7b0e34a453f7dd45c9e7bc04f4c0561cc597faef2d23a126486aec2a99a41
+    api-gateway: sha256:54c1ce34aacc25cd5cef1bc39aee1629031a715fe136a97d5cfaf639d660425c
+    frontend: sha256:848c4bafd3e624678afe1fd912b45d95fe46b3e7251ebbaac486be2224d5527c
+    admin-dashboard: sha256:050dd8cf6da8b53602c3cb216893ffc396ab056be805b41d88b8f0d792d757f6
+    recommendation-service: sha256:1801b31849b29af2716d656fee21c5a9fca31a58c8540272e11fc2dbf2ab7da4
+    video-encoder-job: sha256:2693cdcbe56b01f3143a3f05607d93c7883a75284e773f7c76f0f4badac06448
+    notification-service: sha256:a9716914261ce30b2d2a416f0f3ec7887f5d26cc37b077004a2049acaa24efc9
+    activity-tracker: sha256:8fb300ff68f53e7109ed3064e5933f664d14cf0e9128268f775a2517feaa9dee
+    search-service: sha256:85a54b982d94b56ee296eab610f2176270764a3db69c7f57b1f04cad6e5d0f71
+    billing-service: sha256:72d4866f09ab4051ec12cbf14fa940d8f7c34a2474704a4e5708d800d4ea97b2
