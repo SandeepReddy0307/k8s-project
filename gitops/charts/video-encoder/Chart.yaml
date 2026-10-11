@@ -1,6 +1,0 @@
-apiVersion: v2
-name: video-encoder
-description: Batch transcoding Job + nightly CronJob demo
-type: application
-version: 0.1.0
-appVersion: "1.0.0"

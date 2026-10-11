@@ -2,7 +2,7 @@
 
 The dedicated Word reference for the running local platform is [Kind-Cluster-and-Observability-Setup.docx](Kind-Cluster-and-Observability-Setup.docx). It includes installed versions, Alloy log collection, setup commands, Grafana access, verification results and troubleshooting. The broader microservice architecture is in [StreamFlix-v2-Architecture-and-Deployment.docx](StreamFlix-v2-Architecture-and-Deployment.docx).
 
-The v2 application, consolidated Helm chart and active GitHub workflows are prepared in this repository. The old `devops` kind cluster was deleted at the user's request on 2026-10-10. The replacement is `streamflix-v2`, with context `kind-streamflix-v2`. Application releases still await GitHub Actions. Use namespace `streamflix-v2`; production requires a separate environment and resilient data services.
+The application, consolidated Helm chart and active GitHub workflows are prepared in this repository. The learning cluster is `streamflix-v2`, with context `kind-streamflix-v2`. Application releases still await GitHub Actions. Use namespace `streamflix-v2`; production requires a separate environment and resilient data services.
 
 ## What is included
 
@@ -21,9 +21,9 @@ bash scripts/v2/install-platform.sh
 
 The installer targets `kind-streamflix-v2` explicitly and pins all Helm chart versions. It installs Cilium, Traefik, metrics-server, cert-manager/trust-manager, Prometheus/Grafana/Alertmanager, Tempo, Loki/Alloy and VPA recommendations. External Secrets and Istio are prerequisites for the production profile; Argo CD is a later deployment phase. The local metrics-server flag skips verification of kind's kubelet certificate only. Grafana credentials are generated directly into a Secret without a plaintext password file. Alert delivery needs a separately configured receiver.
 
-Traefik replaces the retired community ingress-nginx controller. Local browser access uses a loopback port-forward on 9443; the application origin and ingress class are set in the learning overlay. This also avoids the original cluster's 8080/8443 port bindings. The saved kind configuration does not depend on CNI hostPort support.
+Traefik provides ingress routing and TLS termination. Local browser access uses a loopback port-forward on 9443; the application origin and ingress class are set in the learning overlay. The saved kind configuration does not depend on CNI hostPort support.
 
-Install and version-pin a policy-enforcing CNI (Cilium or Calico), Traefik, metrics-server, cert-manager, trust-manager, the Prometheus Operator stack and VPA before the learning overlay. kindnet alone does not enforce NetworkPolicies. A hardened learning environment should be a fresh kind cluster with the default CNI disabled and the selected CNI installed. Do not assume the old cluster enforces these policies just because the manifests apply.
+Install and version-pin a policy-enforcing CNI (Cilium or Calico), Traefik, metrics-server, cert-manager, trust-manager, the Prometheus Operator stack and VPA before the learning overlay. kindnet alone does not enforce NetworkPolicies. A hardened learning environment should be a fresh kind cluster with the default CNI disabled and the selected CNI installed. Verify policy enforcement with an actual allowed/denied connectivity test.
 
 Install trust-manager in `cert-manager`, with its trust source namespace set to `cert-manager`. `gitops/platform/local-pki.yaml` puts the self-signed root certificate and its private key in that namespace. The ClusterIssuer signs leaf certificates; trust-manager distributes only the public certificate to namespaces labeled `streamflix.io/trust=true`. Ordinary application service accounts have no Secret-read permission and do not receive the root signing key.
 
@@ -33,13 +33,13 @@ Run from the repository root:
 bash scripts/v2/prepare-learning.sh
 ```
 
-This creates/labels the new namespace, generates local credentials directly into Kubernetes and installs the learning CA. The bootstrap preserves existing Secrets. It does not rotate passwords or update existing database roles. Rotation is a separate operation that must update the database and consumers together. The old v1 demo credentials should be retired when v1 is retired; removing their YAML does not erase Git history.
+This creates/labels the new namespace, generates local credentials directly into Kubernetes and installs the learning CA. The bootstrap preserves existing Secrets. It does not rotate passwords or update existing database roles. Rotation is a separate operation that must update the database and consumers together. Removing credential files from a repository does not erase Git history; rotate any credentials that were previously exposed.
 
 Kubernetes Secret values are base64-encoded, not encrypted by base64. A real cluster needs API/etcd encryption at rest, protected backups, audited RBAC and a secret manager. The learning bootstrap is intentionally different from the production secret-manager path.
 
 ## GitHub Actions
 
-The active workflows are `.github/workflows/ci.yml` and `.github/workflows/deploy.yml`. Historical examples under `ci/github-actions` are not active workflows and target the retired v1 layout.
+The active workflows are `.github/workflows/ci.yml` and `.github/workflows/deploy.yml`. These are the only active release workflows in the repository.
 
 1. Push the reviewed source to the intended GitHub repository. No remote commits or pushes were performed while preparing v2.
 2. Add repository Actions secrets `DOCKERHUB_USERNAME` (the lowercase Docker Hub account name) and `DOCKERHUB_TOKEN` (an access token with read/write permission). CI publishes to `docker.io/<DOCKERHUB_USERNAME>/<service>:<Git SHA>`; the namespace comes from the secret. Create Docker Hub repositories for the twelve service names in the workflow matrix. Public repositories simplify learning-cluster pulls; private repositories need the pull Secret described below. Never commit the token.
@@ -59,7 +59,7 @@ Build context example for troubleshooting (CI normally performs this):
 docker build -f app/frontend/Dockerfile -t streamflix/frontend:test .
 ```
 
-The old `docker build app/frontend` context is incompatible with v2 because the services use a shared runtime and root lockfile.
+Use repository-root Docker build context because the services use a shared runtime and root lockfile.
 
 If Docker Hub repositories are private, provision an image pull Secret through the secret manager and set `imagePullSecrets`. Ensure migration and CronJob Pods receive the same reference. Alternatively use public learning images. Use a separate pull-only token for the cluster; the CI read/write token stays in GitHub Actions secrets.
 

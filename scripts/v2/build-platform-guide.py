@@ -44,7 +44,7 @@ document.add_heading('Kind Cluster and Observability Setup', level=1)
 para('Reference date: 10 October 2026. This guide describes the local platform installed and verified during the cluster reset. It separates running platform services from application features that still await CI deployment.')
 
 heading('1. What was completed')
-para('The old kind cluster named devops was deleted on request, including data stored inside its nodes. A replacement named streamflix-v2 was created with one control-plane and two workers. Its kubectl context is kind-streamflix-v2. All three nodes were Ready at completion.')
+para('The learning cluster named streamflix-v2 was created with one control-plane and two workers. Its kubectl context is kind-streamflix-v2. All three nodes were Ready at completion.')
 para('Ten Helm releases were deployed. Local PKI, public CA distribution and Grafana HTTPS were configured. Generated credentials were submitted directly to Kubernetes Secrets without printing their values. Application containers, application datastores and application Helm releases were not deployed; they remain the next GitHub Actions phase. Argo CD is a later phase.')
 table(['Item', 'Current value'], [
     ['Repository', '/mnt/c/Users/sandeep.reddy01/Downloads/k8s-project'],
@@ -76,7 +76,7 @@ heading('3. Log collection: Alloy, not Fluent Bit')
 para('The retired cluster used Fluent Bit and Promtail. The replacement uses Grafana Alloy. The Fluent Bit/log-shipper chart remains in the repository as a historical artifact but is not installed in this new cluster. Fluent Bit can also send logs to Loki; this switch is an implementation choice, not a requirement imposed by Loki.')
 code('Pod stdout/stderr\n  -> kubelet / Kubernetes pod-log API\n  -> Alloy discovery and loki.source.kubernetes\n  -> Loki HTTP push through loki-v2-gateway\n  -> Grafana Loki datasource and Explore')
 para('Alloy discovers Pods across namespaces, labels namespace/pod/container/service, and reads logs using its ServiceAccount permissions. One API collector can collect across nodes without mounting /var/log or running a collector DaemonSet on every node. Its configuration is gitops/platform/observability-v2/alloy-values.yaml. The write endpoint is derived from Kubernetes DNS: http://loki-v2-gateway.observability-v2.svc.cluster.local/loki/api/v1/push.')
-para('Collection was verified for cert-manager, ingress-system, kube-system, local-path-storage, observability and observability-v2. The application namespace has no application Pods yet, so application log coverage cannot be verified until CI deploys them. Historical logs from the deleted cluster were not migrated.')
+para('Collection was verified for cert-manager, ingress-system, kube-system, local-path-storage, observability and observability-v2. The application namespace has no application Pods yet, so application log coverage cannot be verified until CI deploys them.')
 
 heading('4. Metrics, traces and alerts')
 table(['Signal', 'Flow and current status'], [
@@ -97,7 +97,7 @@ table(['File', 'Purpose'], [
     ['gitops/platform/traefik-learning.yaml', 'Control-plane placement, ClusterIP Service and JSON access logs; no CNI hostPort dependency.'],
     ['gitops/platform/prometheus-learning.yaml', 'Persistent monitoring, generated Grafana Secret reference, TLS ingress and Tempo datasource.'],
     ['gitops/platform/observability-v2/*', 'Loki, Alloy and labeled Grafana Loki datasource ConfigMap.'],
-    ['gitops/infra-manifests/observability/tempo-values.yaml', 'Explicit OTLP receiver bindings and persistent learning trace storage.'],
+    ['gitops/platform/tempo-learning.yaml', 'Explicit OTLP receiver bindings and persistent learning trace storage.'],
     ['scripts/v2/prepare-learning.sh', 'Namespace security labels, credential bootstrap, root CA and public trust synchronization.'],
     ['scripts/v2/bootstrap-grafana.py', 'Random Grafana admin credential stored directly in Kubernetes; existing Secret preserved.'],
     ['scripts/v2/expose-learning-metrics.py', 'Correction for metrics bindings on the initially created local cluster only.'],

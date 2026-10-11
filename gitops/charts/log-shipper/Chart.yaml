@@ -1,6 +1,0 @@
-apiVersion: v2
-name: log-shipper
-description: DaemonSet running fluent-bit on every node, tailing container logs and shipping to Loki
-type: application
-version: 0.1.0
-appVersion: "1.0.0"

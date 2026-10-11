@@ -36,7 +36,7 @@ install cert-manager cert-manager v1.20.4 cert-manager --set crds.enabled=true
 install trust-manager trust-manager v0.25.0 cert-manager --set app.trust.namespace=cert-manager
 python3 scripts/v2/bootstrap-grafana.py
 install kube-prometheus-stack kube-prometheus-stack 92.3.0 observability -f gitops/platform/prometheus-learning.yaml
-install tempo tempo 1.24.4 observability -f gitops/infra-manifests/observability/tempo-values.yaml
+install tempo tempo 1.24.4 observability -f gitops/platform/tempo-learning.yaml
 install loki-v2 loki 18.3.0 observability-v2 -f gitops/platform/observability-v2/loki-values.yaml
 install alloy-v2 alloy 1.13.1 observability-v2 -f gitops/platform/observability-v2/alloy-values.yaml
 kubectl --context "$context" apply -f gitops/platform/observability-v2/grafana-datasource.yaml

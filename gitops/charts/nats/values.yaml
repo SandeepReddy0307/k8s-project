@@ -1,7 +1,0 @@
-image:
-  repository: nats
-  tag: "2.10-alpine"
-replicaCount: 1
-storage:
-  size: 1Gi
-  storageClassName: standard

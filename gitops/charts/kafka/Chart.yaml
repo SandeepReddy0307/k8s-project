@@ -1,6 +1,0 @@
-apiVersion: v2
-name: kafka
-description: Single-broker Kafka (KRaft mode, no Zookeeper) StatefulSet — event bus for the title-viewed activity stream
-type: application
-version: 0.1.0
-appVersion: "3.7"

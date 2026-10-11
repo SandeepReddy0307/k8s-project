@@ -1,6 +1,6 @@
 # Validation record — 10 October 2026
 
-Implemented source and manifests have been checked locally. The old `devops` cluster was deleted at the user's request on 2026-10-10 and replaced with a fresh three-node `streamflix-v2` cluster. The platform setup is recorded separately; application release validation still awaits CI deployment.
+Implemented source and manifests have been checked locally. The learning environment uses a three-node `streamflix-v2` cluster. The platform setup is recorded separately; application release validation still awaits CI deployment.
 
 ## Fresh learning platform — verified 2026-10-10
 
@@ -28,3 +28,9 @@ Application images/releases, application distributed traces and application aler
 - Application image builds/scans, actual GitHub CI run, application rollout/live smoke, application DB TLS, production mTLS, Argo CD sync, load testing, backup restore and secret rotation remain unverified. Platform rollout, cross-node NetworkPolicy enforcement and Grafana HTTPS trust passed the checks above.
 
 These results describe a hardened implementation and reviewable deployment path. Production acceptance still depends on the supplied infrastructure, identities and successful staging verification.
+
+## Repository cleanup — 11 October 2026
+
+Unused service charts, historical workflow examples, old setup scripts, infrastructure manifests, numbered legacy documentation and the unused test console were removed. Active Tempo settings moved to `gitops/platform/tempo-learning.yaml`; platform installer and Word guide references were updated. Existing cluster resources were not changed.
+
+The initial GitHub run built and published images, but the frontend scan reported ten HIGH findings in npm tooling bundled with the Node base image. The eleven local Node Dockerfile hardening changes are uncommitted and await runtime-build/scan verification. No successful complete release promotion or application deployment is claimed.
