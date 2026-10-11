@@ -24,7 +24,49 @@ spec:
       containers:
         - name: migrate
           image: {{ include "streamflix.image" (dict "root" $ "name" $name "service" $service "migration" true) | quote }}
-          command: [node, app/shared/migrate.js]
+          command: [node, -e]
+          args:
+            - |
+              const {database} = require('./app/shared/runtime');
+              const retryable = new Set([
+                'ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED',
+                'ETIMEDOUT', 'ECONNRESET', '57P03'
+              ]);
+
+              (async () => {
+                const pool = database();
+                const deadline = Date.now() + 480000;
+
+                try {
+                  while (true) {
+                    try {
+                      await pool.query('SELECT 1');
+                      break;
+                    } catch (error) {
+                      if (!retryable.has(error.code) ||
+                          Date.now() >= deadline) {
+                        throw error;
+                      }
+                      console.log(JSON.stringify({
+                        event: 'waiting-for-database',
+                        code: error.code
+                      }));
+                      await new Promise(resolve =>
+                        setTimeout(resolve, 5000));
+                    }
+                  }
+                } finally {
+                  await pool.end();
+                }
+
+                require('./app/shared/migrate');
+              })().catch(error => {
+                console.error(JSON.stringify({
+                  event: 'database-wait-failed',
+                  code: error.code || 'configuration-error'
+                }));
+                process.exit(1);
+              });
           envFrom: [{configMapRef: {name: streamflix-config}}]
           env: {{ include "streamflix.env" (dict "root" $ "name" $name "service" $service "migration" true) | nindent 12 }}
           securityContext: {{ include "streamflix.security" . | nindent 12 }}

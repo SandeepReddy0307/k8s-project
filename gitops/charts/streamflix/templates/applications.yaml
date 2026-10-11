@@ -84,7 +84,12 @@ metadata:
   name: {{ $name }}
 spec:
   maxUnavailable: {{ ternary 1 0 (ge (int $service.replicas) 2) }}
-  selector: {matchLabels: {app.kubernetes.io/name: {{ $name }}}}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+    matchExpressions:
+      - key: streamflix.io/migration
+        operator: DoesNotExist
 {{- if and $.Values.autoscaling.enabled (ge (int $service.replicas) 2) }}
 ---
 apiVersion: autoscaling/v2
