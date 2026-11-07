@@ -19,7 +19,7 @@ opentelemetry-instrumentation==0.66b1
 opentelemetry-instrumentation-flask==0.66b1
 opentelemetry-instrumentation-redis==0.66b1
 opentelemetry-instrumentation-requests==0.66b1
-opentelemetry-instrumentation-wsgi==0.66b1
+opentelemetry-instrumentation-wsgi==0.66b2
 opentelemetry-proto==1.45.1
 opentelemetry-sdk==1.45.1
 opentelemetry-semantic-conventions==0.66b1
