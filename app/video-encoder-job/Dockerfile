@@ -1,9 +1,9 @@
-FROM node:22-alpine AS dependencies
+FROM node:25-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY app ./app
 RUN npm ci --workspace app/video-encoder-job --workspace app/shared --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
-FROM node:22-alpine
+FROM node:25-alpine
 # Package managers are build tools; runtime starts directly with node.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
